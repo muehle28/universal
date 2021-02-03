@@ -139,8 +139,36 @@ async function _renderUniversal(
       throw new Error(`Could not find the main bundle: ${serverBundlePath}`);
     }
 
-    const shardedRoutes = shardArray(routes, numProcesses);
-    const spinner = ora(`Prerendering ${routes.length} route(s) to ${outputPath}...`).start();
+    let localizedRoutes;
+    if (localeDirectory.length > 0) {
+      localizedRoutes = routes.filter(route => {
+        if (route.startsWith('/' + localeDirectory)) {
+          return true;
+        } else {
+          let found = false;
+          for (const locOutputPath of browserResult.outputPaths) {
+            const locLocaleDirectory = path.relative(browserResult.baseOutputPath, locOutputPath);
+            if (route.startsWith('/' + locLocaleDirectory)) {
+              found = true;
+            }
+          }
+
+          return !found;
+        }
+      });
+      localizedRoutes = localizedRoutes.map(route => {
+        if (route.startsWith('/' + localeDirectory)) {
+          return route.substring(localeDirectory.length + 1);
+        } else {
+          return route;
+        }
+      });
+    } else {
+      localizedRoutes = routes;
+    }
+
+    const shardedRoutes = shardArray(localizedRoutes, numProcesses);
+    const spinner = ora(`Prerendering ${localizedRoutes.length} route(s) to ${outputPath}...`).start();
 
     try {
       await _parallelRenderRoutes(
